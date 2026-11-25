@@ -99,7 +99,8 @@ button.chip2 { cursor: pointer; }
 .sx.plus:hover { color: var(--cyan); }
 .subs.nested { margin: 2px 0 2px 7px; padding-left: 12px; border-left: 1px solid var(--line2); }
 .sub-r .prog { flex: none; }
-.sub-add input { width: 100%; min-height: 30px; padding: 4px 10px; font-size: 12px; }
+.sub-add { display: flex; gap: 6px; align-items: center; }
+.sub-add input { flex: 1; min-width: 0; width: 100%; min-height: 30px; padding: 4px 10px; font-size: 12px; }
 .prog { font-family: var(--mono); font-size: 10.5px; color: var(--muted); }
 button.prog { background: transparent; border: 1px solid var(--line2); border-radius: 4px; padding: 2px 7px; cursor: pointer; }
 button.prog:hover { color: var(--cyan); border-color: var(--cyan); }
@@ -482,7 +483,7 @@ select.mini { min-height: 28px; padding: 2px 8px; font-size: 11px; max-width: 16
 
   var addingSub = null;
 
-  function subInput(it, id, placeholder, onAdd) {
+  function subInput(it, id, placeholder, onAdd, cancelable) {
     var inp = el("input");
     inp.type = "text";
     inp.id = id;
@@ -500,6 +501,14 @@ select.mini { min-height: 28px; padding: 2px 8px; font-size: 11px; max-width: 16
     });
     var box = el("div", "sub-add");
     box.appendChild(inp);
+    if (cancelable) {
+      var cx = el("button", "sx", "×");
+      cx.type = "button";
+      cx.setAttribute("aria-label", "Cancel");
+      cx.title = "Cancel";
+      cx.addEventListener("click", function () { addingSub = null; refocus = null; render(); });
+      box.appendChild(cx);
+    }
     return box;
   }
 
@@ -563,7 +572,7 @@ select.mini { min-height: 28px; padding: 2px 8px; font-size: 11px; max-width: 16
             saveSubs(it, editTree(it.subs, s.id, function (x) {
               return { id: x.id, t: x.t, done: false, c: (x.c || []).concat([{ id: newId(), t: v, done: false }]) };
             }));
-          }));
+          }, true));
         }
         wrap.appendChild(inner);
       }
