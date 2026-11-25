@@ -18,3 +18,7 @@ create policy "own focus items" on public.focus_items
   for all
   using (user_id = auth.uid())
   with check (user_id = auth.uid());
+
+-- Newer Supabase projects do not expose new tables to the Data API automatically.
+grant usage on schema public to authenticated;
+grant select, insert, update, delete on public.focus_items to authenticated;

@@ -259,7 +259,7 @@ button.chip2 { cursor: pointer; }
 
   async function reload() {
     try { items = await dbLoad(); loaded = true; render(); }
-    catch (e) { loaded = true; render(); say("Could not load the list.", true); }
+    catch (e) { loaded = true; render(); say("Could not load the list: " + (e && e.message ? e.message : "unknown error"), true); }
   }
 
   /* ---------- rendering ---------- */
@@ -461,7 +461,7 @@ button.chip2 { cursor: pointer; }
       say("");
     } catch (e) {
       $("add-title").value = t;
-      say("Could not add that. Try again.", true);
+      say("Could not add that: " + (e && e.message ? e.message : "try again"), true);
     }
   });
 
