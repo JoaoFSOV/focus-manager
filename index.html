@@ -207,6 +207,7 @@ select.mini { min-height: 28px; padding: 2px 8px; font-size: 11px; max-width: 16
   var contOk = true;
   var cur = "all";
   var editing = false;
+  var adding = false;
   var lastCur = null;
   var filter = "open";
   var collapsed = {};
@@ -384,7 +385,7 @@ select.mini { min-height: 28px; padding: 2px 8px; font-size: 11px; max-width: 16
       b.type = "button";
       b.setAttribute("aria-pressed", cur === key ? "true" : "false");
       b.addEventListener("click", function () {
-        cur = key; armedC = false; editing = false;
+        cur = key; armedC = false; editing = false; adding = false;
         $("add-cont").value = (key === "all" || key === "none") ? "" : key;
         render();
       });
@@ -408,12 +409,24 @@ select.mini { min-height: 28px; padding: 2px 8px; font-size: 11px; max-width: 16
       });
       bar.appendChild(eb);
     }
+    if (!isCont && contOk) {
+      var ab = el("button", "cchip edit", adding ? "Close" : "Add container");
+      ab.type = "button";
+      ab.setAttribute("aria-label", "Add a new container");
+      ab.setAttribute("aria-pressed", adding ? "true" : "false");
+      ab.addEventListener("click", function () {
+        adding = !adding;
+        render();
+        if (adding) $("new-cont").focus();
+      });
+      bar.appendChild(ab);
+    }
     ed.hidden = !(isCont && editing);
     if (isCont && lastCur !== cur) $("ren-name").value = contName(cur);
     lastCur = cur;
     $("cont-del").textContent = armedC ? "Sure? Items go to Inbox" : "Delete container";
     $("cont-del").className = "ghost" + (armedC ? " armed" : "");
-    $("cont-form").hidden = !contOk;
+    $("cont-form").hidden = !(contOk && adding && !isCont);
     var ac = $("add-cont");
     var keep = ac.value;
     fillContSelect(ac, keep);
@@ -616,7 +629,7 @@ select.mini { min-height: 28px; padding: 2px 8px; font-size: 11px; max-width: 16
     try {
       var c = await dbContAdd(n);
       containers.push(c);
-      cur = c.id; lastCur = null;
+      cur = c.id; lastCur = null; adding = false;
       render();
       $("add-cont").value = c.id;
       say("");
