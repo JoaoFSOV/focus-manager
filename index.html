@@ -83,6 +83,9 @@ button.chip2 { cursor: pointer; }
 .ghost { background: transparent; border: 1px solid var(--line2); border-radius: 5px; padding: 3px 10px; font-family: var(--mono); font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); cursor: pointer; white-space: nowrap; }
 .ghost:hover { color: var(--fg); border-color: var(--muted); }
 .ghost.armed { color: var(--bad); border-color: var(--bad); }
+.actions .ghost { color: var(--bad); border-color: rgba(255,92,122,.45); }
+.actions .ghost:hover { color: #fff; background: var(--bad); border-color: var(--bad); }
+.actions .ghost.armed { color: #fff; background: var(--bad); border-color: var(--bad); }
 .empty { color: var(--muted); font-size: 13px; padding: 22px 0; text-align: center; font-family: var(--mono); }
 .note { font-family: var(--mono); font-size: 11px; color: var(--dim); margin: 0; min-height: 16px; }
 .note.err { color: var(--bad); }
@@ -114,6 +117,8 @@ button.chip2 { cursor: pointer; }
 .prog .pr { color: var(--bad); }
 .cchip { background: transparent; border: 1px solid var(--line2); border-radius: 6px; padding: 4px 12px; font-family: var(--mono); font-size: 11px; letter-spacing: .08em; color: var(--muted); cursor: pointer; }
 .cchip.edit { margin-left: auto; border-style: dashed; color: var(--dim); }
+.cchip.addc { color: var(--cyan); border-color: rgba(62,230,255,.5); transition: background .12s, color .12s, border-color .12s; }
+.cchip.addc:hover { background: rgba(62,230,255,.14); border-color: var(--cyan); border-style: solid; box-shadow: 0 0 10px rgba(62,230,255,.25); }
 .cchip.edit[aria-pressed=true] { color: var(--fg); border-color: var(--muted); background: transparent; }
 .cchip[aria-pressed=true] { background: var(--panel2); color: var(--violet); border-color: var(--violet); }
 .cont-edit, .cont-new { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
@@ -422,7 +427,7 @@ select.mini { min-height: 28px; padding: 2px 8px; font-size: 11px; max-width: 16
       bar.appendChild(eb);
     }
     if (!isCont && contOk) {
-      var ab = el("button", "cchip edit", adding ? "Close" : "Add container");
+      var ab = el("button", "cchip edit addc", adding ? "Close" : "Add container");
       ab.type = "button";
       ab.setAttribute("aria-label", "Add a new container");
       ab.setAttribute("aria-pressed", adding ? "true" : "false");
