@@ -511,25 +511,6 @@ select.mini { min-height: 28px; padding: 2px 8px; font-size: 11px; max-width: 16
     }
     main.appendChild(top);
 
-    if (!it.done) {
-      var lab = el("label", "next");
-      lab.appendChild(el("span", null, "Next"));
-      var inp = el("input");
-      inp.type = "text";
-      inp.id = "next-" + it.id;
-      inp.value = it.next || "";
-      inp.placeholder = it.st === "idea" ? "What would be step one?" : "Next concrete step";
-      inp.maxLength = 200;
-      inp.addEventListener("input", function () { dirty = true; });
-      inp.addEventListener("change", function () {
-        dirty = false;
-        save(it.id, { next: inp.value.trim() });
-      });
-      inp.addEventListener("blur", function () { if (dirty) { dirty = false; render(); } });
-      inp.addEventListener("keydown", function (e) { if (e.key === "Enter") inp.blur(); });
-      lab.appendChild(inp);
-      main.appendChild(lab);
-    }
     main.appendChild(subsUI(it));
     li.appendChild(main);
 
