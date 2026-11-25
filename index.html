@@ -99,6 +99,7 @@ button.chip2 { cursor: pointer; }
 .cchip[aria-pressed=true] { background: var(--panel2); color: var(--violet); border-color: var(--violet); }
 .cont-edit, .cont-new { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 .cont-edit input, .cont-new input { flex: 1 1 240px; min-width: 0; min-height: 40px; padding: 9px 12px; font-size: 13px; }
+.btn.alt { background: var(--violet); color: #120a30; box-shadow: 0 0 14px rgba(157,123,255,.35); }
 .cont-edit .ghost { min-height: 40px; padding: 0 16px; font-size: 12px; }
 select.mini { min-height: 28px; padding: 2px 8px; font-size: 11px; max-width: 160px; border-radius: 5px; }
 .chip2.cont { color: var(--violet); }
@@ -167,7 +168,7 @@ select.mini { min-height: 28px; padding: 2px 8px; font-size: 11px; max-width: 16
     </div>
     <form class="cont-new" id="cont-form" autocomplete="off">
       <input type="text" id="new-cont" placeholder="New container (Work, Personal...)" maxlength="40" aria-label="New container name">
-      <button class="btn" type="submit">Add container</button>
+      <button class="btn alt" type="submit">Add container</button>
     </form>
     <div class="chips" role="group" aria-label="Filter">
       <button class="chip" data-f="open" aria-pressed="true">Open</button>
