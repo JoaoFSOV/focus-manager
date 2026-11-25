@@ -96,7 +96,14 @@ button.chip2 { cursor: pointer; }
 .sub-r.sdone .st { text-decoration: line-through; color: var(--muted); }
 .sx { background: transparent; border: 0; color: var(--dim); cursor: pointer; font-size: 16px; line-height: 1; padding: 0 4px; }
 .sx:hover { color: var(--bad); }
-.sx.plus:hover { color: var(--cyan); }
+.sx.plus:hover, .sx.edit:hover { color: var(--cyan); }
+.sx.edit { font-size: 13px; }
+.sub-r .st, .row:not(.done) .title { cursor: pointer; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+.sub-r { border-radius: 6px; padding: 2px 4px; margin: 0 -4px; transition: background .12s; }
+.sub-r:hover { background: rgba(62,230,255,.08); }
+.row:not(.done) .title { border-radius: 4px; padding: 1px 4px; margin: -1px -4px; }
+.row:not(.done) .title:hover { background: rgba(62,230,255,.08); }
+.st-edit, .title-edit { flex: 1; min-width: 160px; min-height: 30px; padding: 4px 10px; font-size: 13px; }
 .subs.nested { margin: 2px 0 2px 7px; padding-left: 12px; border-left: 1px solid var(--line2); }
 .sub-r .prog { flex: none; }
 .sub-add { display: flex; gap: 6px; align-items: center; }
@@ -482,6 +489,60 @@ select.mini { min-height: 28px; padding: 2px 8px; font-size: 11px; max-width: 16
   function newId() { return "s" + Date.now().toString(36) + Math.random().toString(36).slice(2, 5); }
 
   var addingSub = null;
+  var editingId = null, editVal = "", clickTimer = null;
+
+  function pressable(node, onClick, onLong) {
+    var timer = null, fired = false;
+    function stop() { clearTimeout(timer); }
+    node.addEventListener("pointerdown", function (e) {
+      if (e.button) return;
+      fired = false;
+      stop();
+      timer = setTimeout(function () { fired = true; clearTimeout(clickTimer); onLong(); }, 550);
+    });
+    ["pointerup", "pointerleave", "pointercancel"].forEach(function (t) { node.addEventListener(t, stop); });
+    node.addEventListener("contextmenu", function (e) { e.preventDefault(); });
+    node.addEventListener("click", function () {
+      if (fired) { fired = false; return; }
+      clearTimeout(clickTimer);
+      clickTimer = setTimeout(onClick, 260);
+    });
+    node.addEventListener("dblclick", function () { clearTimeout(clickTimer); onLong(); });
+  }
+
+  function startEdit(id, cur) { editingId = id; editVal = cur; addingSub = null; render(); }
+  function editBox(id, cls, commit) {
+    var inp = el("input", cls);
+    inp.type = "text";
+    inp.id = "edit-" + id;
+    inp.value = editVal;
+    inp.maxLength = 200;
+    inp.setAttribute("aria-label", "Edit text");
+    var finished = false;
+    function end(save) {
+      if (finished) return;
+      finished = true;
+      var v = inp.value.trim();
+      editingId = null;
+      if (save && v && v !== editVal0) commit(v); else render();
+    }
+    var editVal0 = editVal;
+    inp.addEventListener("input", function () { editVal = inp.value; });
+    inp.addEventListener("keydown", function (e) {
+      if (e.key === "Enter") end(true);
+      else if (e.key === "Escape") end(false);
+    });
+    inp.addEventListener("blur", function () { end(true); });
+    return inp;
+  }
+  function editBtn(id, cur, label) {
+    var b = el("button", "sx edit", "✎");
+    b.type = "button";
+    b.setAttribute("aria-label", label);
+    b.title = "Edit";
+    b.addEventListener("click", function () { startEdit(id, cur); });
+    return b;
+  }
   var plusDown = null;
 
   function subInput(it, id, placeholder, onAdd, cancelable) {
@@ -551,7 +612,25 @@ select.mini { min-height: 28px; padding: 2px 8px; font-size: 11px; max-width: 16
         });
         r.appendChild(tg);
       }
-      r.appendChild(el("span", "st", s.t));
+      if (editingId === s.id) {
+        r.appendChild(editBox(s.id, "st-edit", function (v) {
+          saveSubs(it, editTree(it.subs, s.id, function (x) {
+            var o = { id: x.id, t: v, done: x.done }; if (x.c) o.c = x.c; return o;
+          }));
+        }));
+      } else {
+        var st = el("span", "st", s.t);
+        st.title = "Click: add inside · Hold or double-click: edit";
+        pressable(st, function () {
+          if (it.done || depth >= 5) return;
+          addingSub = addingSub === s.id ? null : s.id;
+          if (addingSub) delete collapsed[s.id];
+          render();
+          if (addingSub) { var f = $("sub-" + s.id); if (f) f.focus(); }
+        }, function () { startEdit(s.id, s.t); });
+        r.appendChild(st);
+        r.appendChild(editBtn(s.id, s.t, "Edit subtask"));
+      }
       if (!it.done && depth < 5) {
         var ad = el("button", "sx plus", "+");
         ad.type = "button";
@@ -621,7 +700,18 @@ select.mini { min-height: 28px; padding: 2px 8px; font-size: 11px; max-width: 16
 
     var main = el("div", "main");
     var top = el("div", "tp");
-    top.appendChild(el("span", "title", it.title));
+    if (editingId === it.id) {
+      top.appendChild(editBox(it.id, "title-edit", function (v) { save(it.id, { title: v }); }));
+    } else {
+      var tt = el("span", "title", it.title);
+      tt.title = "Click: add subtask · Hold or double-click: edit";
+      pressable(tt, function () {
+        if (it.done) return;
+        var f = $("sub-" + it.id); if (f) f.focus();
+      }, function () { startEdit(it.id, it.title); });
+      top.appendChild(tt);
+      top.appendChild(editBtn(it.id, it.title, "Edit task"));
+    }
     if (!it.done) {
       var st = it.st;
       var nx = st === "idea" ? "active" : st === "active" ? "stalled" : "idea";
@@ -702,7 +792,8 @@ select.mini { min-height: 28px; padding: 2px 8px; font-size: 11px; max-width: 16
       return;
     }
     vis.forEach(function (it) { list.appendChild(row(it)); });
-    if (refocus) { var rf = $(refocus); if (rf) rf.focus(); }
+    if (editingId) { var ef = $("edit-" + editingId); if (ef) { ef.focus(); ef.setSelectionRange(ef.value.length, ef.value.length); } }
+    else if (refocus) { var rf = $(refocus); if (rf) rf.focus(); }
   }
 
   /* ---------- wiring ---------- */
