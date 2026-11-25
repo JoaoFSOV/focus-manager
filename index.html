@@ -98,7 +98,8 @@ button.chip2 { cursor: pointer; }
 .cchip { background: transparent; border: 1px solid var(--line2); border-radius: 6px; padding: 4px 12px; font-family: var(--mono); font-size: 11px; letter-spacing: .08em; color: var(--muted); cursor: pointer; }
 .cchip[aria-pressed=true] { background: var(--panel2); color: var(--violet); border-color: var(--violet); }
 .cont-edit, .cont-new { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
-.cont-edit input, .cont-new input { flex: 1 1 200px; min-width: 0; min-height: 34px; padding: 5px 10px; font-size: 12.5px; }
+.cont-edit input, .cont-new input { flex: 1 1 240px; min-width: 0; min-height: 40px; padding: 9px 12px; font-size: 13px; }
+.cont-edit .ghost { min-height: 40px; padding: 0 16px; font-size: 12px; }
 select.mini { min-height: 28px; padding: 2px 8px; font-size: 11px; max-width: 160px; border-radius: 5px; }
 .chip2.cont { color: var(--violet); }
 @media (max-width: 760px) { .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
@@ -166,7 +167,7 @@ select.mini { min-height: 28px; padding: 2px 8px; font-size: 11px; max-width: 16
     </div>
     <form class="cont-new" id="cont-form" autocomplete="off">
       <input type="text" id="new-cont" placeholder="New container (Work, Personal...)" maxlength="40" aria-label="New container name">
-      <button class="ghost" type="submit">+ Container</button>
+      <button class="btn" type="submit">Add container</button>
     </form>
     <div class="chips" role="group" aria-label="Filter">
       <button class="chip" data-f="open" aria-pressed="true">Open</button>
