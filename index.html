@@ -99,6 +99,8 @@ button.chip2 { cursor: pointer; }
 .sub-add input { width: 100%; min-height: 30px; padding: 4px 10px; font-size: 12px; }
 .prog { font-family: var(--mono); font-size: 10.5px; color: var(--muted); }
 .cchip { background: transparent; border: 1px solid var(--line2); border-radius: 6px; padding: 4px 12px; font-family: var(--mono); font-size: 11px; letter-spacing: .08em; color: var(--muted); cursor: pointer; }
+.cchip.edit { margin-left: auto; border-style: dashed; color: var(--dim); }
+.cchip.edit[aria-pressed=true] { color: var(--fg); border-color: var(--muted); background: transparent; }
 .cchip[aria-pressed=true] { background: var(--panel2); color: var(--violet); border-color: var(--violet); }
 .cont-edit, .cont-new { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 .cont-edit input, .cont-new input { flex: 1 1 240px; min-width: 0; min-height: 40px; padding: 9px 12px; font-size: 13px; }
@@ -196,6 +198,7 @@ select.mini { min-height: 28px; padding: 2px 8px; font-size: 11px; max-width: 16
   var containers = [];
   var contOk = true;
   var cur = "all";
+  var editing = false;
   var lastCur = null;
   var filter = "open";
   var armed = null;
@@ -371,7 +374,7 @@ select.mini { min-height: 28px; padding: 2px 8px; font-size: 11px; max-width: 16
       b.type = "button";
       b.setAttribute("aria-pressed", cur === key ? "true" : "false");
       b.addEventListener("click", function () {
-        cur = key; armedC = false;
+        cur = key; armedC = false; editing = false;
         $("add-cont").value = (key === "all" || key === "none") ? "" : key;
         render();
       });
@@ -383,7 +386,19 @@ select.mini { min-height: 28px; padding: 2px 8px; font-size: 11px; max-width: 16
 
     var ed = $("cont-edit");
     var isCont = cur !== "all" && cur !== "none";
-    ed.hidden = !isCont;
+    if (isCont) {
+      var eb = el("button", "cchip edit", editing ? "Close" : "Edit");
+      eb.type = "button";
+      eb.setAttribute("aria-label", "Edit selected container");
+      eb.setAttribute("aria-pressed", editing ? "true" : "false");
+      eb.addEventListener("click", function () {
+        editing = !editing; armedC = false;
+        if (editing) lastCur = null;
+        render();
+      });
+      bar.appendChild(eb);
+    }
+    ed.hidden = !(isCont && editing);
     if (isCont && lastCur !== cur) $("ren-name").value = contName(cur);
     lastCur = cur;
     $("cont-del").textContent = armedC ? "Sure? Items go to Inbox" : "Delete container";
@@ -617,6 +632,7 @@ select.mini { min-height: 28px; padding: 2px 8px; font-size: 11px; max-width: 16
     try {
       await dbContRename(id, n);
       containers.forEach(function (c) { if (c.id === id) c.name = n; });
+      editing = false;
       render();
       say("");
     } catch (e) { say("Could not rename: " + msgOf(e), true); }
@@ -637,7 +653,7 @@ select.mini { min-height: 28px; padding: 2px 8px; font-size: 11px; max-width: 16
       await dbContDelete(id);
       containers = containers.filter(function (c) { return c.id !== id; });
       items.forEach(function (x) { if (x.container === id) x.container = null; });
-      cur = "all";
+      cur = "all"; editing = false;
       render();
       say("");
     } catch (e) { say("Could not delete the container: " + msgOf(e), true); }
