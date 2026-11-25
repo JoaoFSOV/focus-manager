@@ -41,12 +41,13 @@ body {
 .sub { font-family: var(--mono); font-size: 11px; color: var(--muted); letter-spacing: .06em; text-transform: uppercase; }
 .take { margin: 0; font-size: 15px; color: var(--muted); line-height: 1.6; }
 .take b { color: var(--fg); font-family: var(--mono); font-weight: 600; }
-.lvls { font-family: var(--mono); font-size: 11px; color: var(--muted); margin-top: 4px; min-height: 14px; letter-spacing: .04em; }
 .kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
 .tile { background: linear-gradient(180deg, var(--panel2), var(--panel)); border: 1px solid var(--line); border-radius: 10px; padding: 14px 14px 12px; position: relative; overflow: hidden; min-width: 0; }
 .tile::after { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 2px; background: var(--accent); opacity: .8; box-shadow: 0 0 12px var(--accent); }
 .lab { font-family: var(--mono); font-size: 10.5px; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
-.val { font-family: var(--mono); font-size: clamp(20px, 2.4vw, 28px); font-weight: 600; margin-top: 8px; font-variant-numeric: tabular-nums; }
+.val .lv { display: inline-flex; align-items: baseline; gap: 3px; margin-right: 12px; }
+.val .lvt { font-size: 11px; font-weight: 600; letter-spacing: .06em; color: var(--muted); }
+.val { display: flex; flex-wrap: wrap; align-items: baseline; font-family: var(--mono); font-size: clamp(20px, 2.4vw, 28px); font-weight: 600; margin-top: 8px; font-variant-numeric: tabular-nums; }
 .p { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 16px; min-width: 0; display: flex; flex-direction: column; gap: 12px; }
 .p h2 { margin: 0; font-family: var(--mono); font-size: 12px; letter-spacing: .14em; text-transform: uppercase; font-weight: 600; display: flex; justify-content: space-between; gap: 8px; align-items: center; flex-wrap: wrap; }
 .p h2 small { font-size: 10.5px; color: var(--dim); letter-spacing: .08em; font-weight: 400; }
@@ -175,10 +176,10 @@ select.mini { min-height: 28px; padding: 2px 8px; font-size: 11px; max-width: 16
   <p class="take" id="take" aria-live="polite">Loading…</p>
 
   <section class="kpis" aria-live="polite">
-    <div class="tile" style="--accent: var(--cyan)"><div class="lab">Active</div><div class="val" id="s-active">0</div><div class="lvls" id="l-active"></div></div>
-    <div class="tile" style="--accent: var(--warn)"><div class="lab">Stalled</div><div class="val" id="s-stalled">0</div><div class="lvls" id="l-stalled"></div></div>
-    <div class="tile" style="--accent: var(--violet)"><div class="lab">Ideas</div><div class="val" id="s-ideas">0</div><div class="lvls" id="l-ideas"></div></div>
-    <div class="tile" style="--accent: var(--ok)"><div class="lab">Done</div><div class="val" id="s-done">0</div><div class="lvls" id="l-done"></div></div>
+    <div class="tile" style="--accent: var(--cyan)"><div class="lab">Active</div><div class="val" id="s-active">0</div></div>
+    <div class="tile" style="--accent: var(--warn)"><div class="lab">Stalled</div><div class="val" id="s-stalled">0</div></div>
+    <div class="tile" style="--accent: var(--violet)"><div class="lab">Ideas</div><div class="val" id="s-ideas">0</div></div>
+    <div class="tile" style="--accent: var(--ok)"><div class="lab">Done</div><div class="val" id="s-done">0</div></div>
   </section>
 
   <section class="p">
@@ -379,9 +380,21 @@ select.mini { min-height: 28px; padding: 2px 8px; font-size: 11px; max-width: 16
   function showLevels(id, box) {
     var n = $(id);
     if (!n) return;
-    var parts = [];
-    for (var d = 0; d < LVL.length; d++) if (box[d]) parts.push(box[d] + " " + LVL[d]);
-    n.textContent = parts.join(" · ");
+    n.textContent = "";
+    var any = false;
+    for (var d = 0; d < LVL.length; d++) {
+      if (!box[d]) continue;
+      any = true;
+      var g = el("span", "lv");
+      g.appendChild(el("span", "lvn", String(box[d])));
+      g.appendChild(el("small", "lvt", "N" + (d + 1)));
+      n.appendChild(g);
+    }
+    if (!any) {
+      var z = el("span", "lv");
+      z.appendChild(el("span", "lvn", "0"));
+      n.appendChild(z);
+    }
   }
   function stats() {
     var a = 0, s = 0, i = 0, d = 0;
@@ -396,14 +409,10 @@ select.mini { min-height: 28px; padding: 2px 8px; font-size: 11px; max-width: 16
       addLevels(lv[key], it.subs, 1, key === "done");
       if (key !== "done") addLevels(lv.done, it.subs, 1, true);
     });
-    showLevels("l-active", lv.active);
-    showLevels("l-stalled", lv.stalled);
-    showLevels("l-ideas", lv.idea);
-    showLevels("l-done", lv.done);
-    $("s-active").textContent = a;
-    $("s-stalled").textContent = s;
-    $("s-ideas").textContent = i;
-    $("s-done").textContent = d;
+    showLevels("s-active", lv.active);
+    showLevels("s-stalled", lv.stalled);
+    showLevels("s-ideas", lv.idea);
+    showLevels("s-done", lv.done);
     var t = $("take");
     t.textContent = "";
     if (!loaded) { t.textContent = "Loading…"; return; }
