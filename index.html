@@ -79,7 +79,7 @@ button.chip2 { cursor: pointer; }
 .next { display: flex; gap: 8px; align-items: center; min-width: 0; }
 .next span { font-family: var(--mono); font-size: 10.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); flex: none; }
 .next input { flex: 1; min-width: 0; padding: 5px 10px; min-height: 32px; font-size: 12.5px; }
-.actions { display: flex; flex-direction: column; gap: 6px; align-items: flex-end; }
+.actions { display: flex; flex-direction: row; flex-wrap: wrap; gap: 6px; align-items: center; justify-content: flex-end; }
 .ghost { background: transparent; border: 1px solid var(--line2); border-radius: 5px; padding: 3px 10px; font-family: var(--mono); font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); cursor: pointer; white-space: nowrap; }
 .ghost:hover { color: var(--fg); border-color: var(--muted); }
 .ghost.armed { color: var(--bad); border-color: var(--bad); }
