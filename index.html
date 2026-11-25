@@ -96,6 +96,9 @@ button.chip2 { cursor: pointer; }
 .sub-r.sdone .st { text-decoration: line-through; color: var(--muted); }
 .sx { background: transparent; border: 0; color: var(--dim); cursor: pointer; font-size: 16px; line-height: 1; padding: 0 4px; }
 .sx:hover { color: var(--bad); }
+.sx.plus:hover { color: var(--cyan); }
+.subs.nested { margin: 2px 0 2px 7px; padding-left: 12px; border-left: 1px solid var(--line2); }
+.sub-r .prog { flex: none; }
 .sub-add input { width: 100%; min-height: 30px; padding: 4px 10px; font-size: 12px; }
 .prog { font-family: var(--mono); font-size: 10.5px; color: var(--muted); }
 button.prog { background: transparent; border: 1px solid var(--line2); border-radius: 4px; padding: 2px 7px; cursor: pointer; }
@@ -432,48 +435,148 @@ select.mini { min-height: 28px; padding: 2px 8px; font-size: 11px; max-width: 16
     fillContSelect(ac, keep);
   }
 
-  function subsUI(it) {
-    var wrap = el("div", "subs");
-    var subs = it.subs || [];
-    subs.forEach(function (s) {
+  /* nested subtasks: a sub is {id, t, done, c?: [subs]}; a sub with children is done when all its children are */
+  function mapSubs(list, fn) {
+    return list.map(function (s) {
+      var n = fn(s);
+      if (n.c && n.c.length) {
+        n = { id: n.id, t: n.t, done: n.c.every(function (x) { return x.done; }), c: n.c };
+      }
+      return n;
+    });
+  }
+  function setAll(list, done) {
+    return list.map(function (s) {
+      var o = { id: s.id, t: s.t, done: done };
+      if (s.c && s.c.length) o.c = setAll(s.c, done);
+      return o;
+    });
+  }
+  function fixTree(list) {
+    return list.map(function (s) {
+      if (s.c && s.c.length) {
+        var c = fixTree(s.c);
+        return { id: s.id, t: s.t, done: c.every(function (x) { return x.done; }), c: c };
+      }
+      return { id: s.id, t: s.t, done: !!s.done };
+    });
+  }
+  function editTree(list, id, fn) {
+    var out = [];
+    list.forEach(function (s) {
+      if (s.id === id) { var r = fn(s); if (r) out.push(r); return; }
+      if (s.c && s.c.length) out.push({ id: s.id, t: s.t, done: s.done, c: editTree(s.c, id, fn) });
+      else out.push(s);
+    });
+    return fixTree(out);
+  }
+  function leafCount(list) {
+    var t = 0, d = 0;
+    list.forEach(function (s) {
+      if (s.c && s.c.length) { var r = leafCount(s.c); t += r.t; d += r.d; }
+      else { t++; if (s.done) d++; }
+    });
+    return { t: t, d: d };
+  }
+  function newId() { return "s" + Date.now().toString(36) + Math.random().toString(36).slice(2, 5); }
+
+  var addingSub = null;
+
+  function subInput(it, id, placeholder, onAdd) {
+    var inp = el("input");
+    inp.type = "text";
+    inp.id = id;
+    inp.placeholder = placeholder;
+    inp.maxLength = 160;
+    inp.setAttribute("aria-label", placeholder);
+    inp.addEventListener("keydown", function (e) {
+      if (e.key === "Escape") { addingSub = null; render(); return; }
+      if (e.key !== "Enter") return;
+      var v = inp.value.trim();
+      if (!v) return;
+      refocus = id;
+      inp.value = "";
+      onAdd(v);
+    });
+    var box = el("div", "sub-add");
+    box.appendChild(inp);
+    return box;
+  }
+
+  function subList(it, list, depth) {
+    var wrap = el("div", "subs" + (depth ? " nested" : ""));
+    list.forEach(function (s) {
+      var has = s.c && s.c.length;
       var r = el("div", "sub-r" + (s.done ? " sdone" : ""));
       var c = el("button", "sc");
       c.type = "button";
       c.setAttribute("aria-pressed", s.done ? "true" : "false");
       c.setAttribute("aria-label", s.done ? "Mark subtask as not done" : "Mark subtask as done");
       c.addEventListener("click", function () {
-        saveSubs(it, subs.map(function (x) { return x.id === s.id ? { id: x.id, t: x.t, done: !x.done } : x; }));
+        saveSubs(it, editTree(it.subs, s.id, function (x) {
+          var nd = !x.done;
+          var o = { id: x.id, t: x.t, done: nd };
+          if (x.c && x.c.length) o.c = setAll(x.c, nd);
+          return o;
+        }));
       });
       r.appendChild(c);
+      if (has) {
+        var isC = !!collapsed[s.id];
+        var tg = el("button", "prog", (isC ? "▸ " : "▾ ") + leafCount(s.c).d + "/" + leafCount(s.c).t);
+        tg.type = "button";
+        tg.setAttribute("aria-expanded", isC ? "false" : "true");
+        tg.title = isC ? "Show subtasks" : "Hide subtasks";
+        tg.addEventListener("click", function () {
+          if (collapsed[s.id]) delete collapsed[s.id]; else collapsed[s.id] = 1;
+          try { localStorage.setItem("fm-collapsed", JSON.stringify(collapsed)); } catch (e) {}
+          render();
+        });
+        r.appendChild(tg);
+      }
       r.appendChild(el("span", "st", s.t));
+      if (!it.done && depth < 5) {
+        var ad = el("button", "sx plus", "+");
+        ad.type = "button";
+        ad.setAttribute("aria-label", "Add a subtask inside this one");
+        ad.title = "Add a subtask inside";
+        ad.addEventListener("click", function () {
+          addingSub = addingSub === s.id ? null : s.id;
+          if (addingSub) delete collapsed[s.id];
+          render();
+          if (addingSub) { var f = $("sub-" + s.id); if (f) f.focus(); }
+        });
+        r.appendChild(ad);
+      }
       var x = el("button", "sx", "×");
       x.type = "button";
       x.setAttribute("aria-label", "Remove subtask");
       x.addEventListener("click", function () {
-        saveSubs(it, subs.filter(function (y) { return y.id !== s.id; }));
+        saveSubs(it, editTree(it.subs, s.id, function () { return null; }));
       });
       r.appendChild(x);
       wrap.appendChild(r);
+      if ((has && !collapsed[s.id]) || addingSub === s.id) {
+        var inner = has && !collapsed[s.id] ? subList(it, s.c, depth + 1) : el("div", "subs nested");
+        if (addingSub === s.id) {
+          inner.appendChild(subInput(it, "sub-" + s.id, "+ inside (Enter, Esc closes)", function (v) {
+            saveSubs(it, editTree(it.subs, s.id, function (x) {
+              return { id: x.id, t: x.t, done: false, c: (x.c || []).concat([{ id: newId(), t: v, done: false }]) };
+            }));
+          }));
+        }
+        wrap.appendChild(inner);
+      }
     });
+    return wrap;
+  }
+
+  function subsUI(it) {
+    var wrap = subList(it, it.subs || [], 0);
     if (!it.done) {
-      var inp = el("input");
-      inp.type = "text";
-      inp.id = "sub-" + it.id;
-      inp.placeholder = "+ subtask (Enter)";
-      inp.maxLength = 160;
-      inp.setAttribute("aria-label", "Add subtask");
-      inp.addEventListener("keydown", function (e) {
-        if (e.key !== "Enter") return;
-        var v = inp.value.trim();
-        if (!v) return;
-        refocus = inp.id;
-        var nid = "s" + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
-        inp.value = "";
-        saveSubs(it, subs.concat([{ id: nid, t: v, done: false }]));
-      });
-      var box = el("div", "sub-add");
-      box.appendChild(inp);
-      wrap.appendChild(box);
+      wrap.appendChild(subInput(it, "sub-" + it.id, "+ subtask (Enter)", function (v) {
+        saveSubs(it, fixTree((it.subs || []).concat([{ id: newId(), t: v, done: false }])));
+      }));
     }
     return wrap;
   }
@@ -492,7 +595,7 @@ select.mini { min-height: 28px; padding: 2px 8px; font-size: 11px; max-width: 16
     chk.addEventListener("click", function () {
       var nd = !it.done;
       var u = { done: nd, doneAt: nd ? Date.now() : null };
-      if (it.subs && it.subs.length) u.subs = it.subs.map(function (s) { return { id: s.id, t: s.t, done: nd }; });
+      if (it.subs && it.subs.length) u.subs = setAll(it.subs, nd);
       save(it.id, u);
     });
     li.appendChild(chk);
@@ -516,16 +619,16 @@ select.mini { min-height: 28px; padding: 2px 8px; font-size: 11px; max-width: 16
       ro.addEventListener("change", function () {
         if (!ro.value) return;
         var u = { done: false, doneAt: null, status: ro.value };
-        if (it.subs && it.subs.length) u.subs = it.subs.map(function (s) { return { id: s.id, t: s.t, done: false }; });
+        if (it.subs && it.subs.length) u.subs = setAll(it.subs, false);
         save(it.id, u);
       });
       top.appendChild(ro);
     }
     if (cur === "all" && it.container) top.appendChild(el("span", "chip2 cont", contName(it.container)));
     if (it.subs && it.subs.length) {
-      var dn = it.subs.filter(function (s) { return s.done; }).length;
+      var lc = leafCount(it.subs), dn = lc.d;
       var isC = !!collapsed[it.id];
-      var tg = el("button", "prog", (isC ? "▸ " : "▾ ") + dn + "/" + it.subs.length);
+      var tg = el("button", "prog", (isC ? "▸ " : "▾ ") + dn + "/" + lc.t);
       tg.type = "button";
       tg.setAttribute("aria-expanded", isC ? "false" : "true");
       tg.title = isC ? "Show subtasks" : "Hide subtasks";
