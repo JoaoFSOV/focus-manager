@@ -488,6 +488,9 @@ select.mini { min-height: 28px; padding: 2px 8px; font-size: 11px; max-width: 16
     });
     return fixTree(out);
   }
+  function directCount(list) {
+    return { t: list.length, d: list.filter(function (x) { return x.done; }).length };
+  }
   function leafCount(list) {
     var t = 0, d = 0;
     list.forEach(function (s) {
@@ -618,7 +621,7 @@ select.mini { min-height: 28px; padding: 2px 8px; font-size: 11px; max-width: 16
         }));
       });
       r.appendChild(c);
-      if (has) { var slc = leafCount(s.c); r.appendChild(progBadge(slc.d, slc.t)); }
+      if (has) { var slc = directCount(s.c); r.appendChild(progBadge(slc.d, slc.t)); }
       if (editingId === s.id) {
         r.appendChild(editBox(s.id, "st-edit", function (v) {
           saveSubs(it, editTree(it.subs, s.id, function (x) {
@@ -720,7 +723,7 @@ select.mini { min-height: 28px; padding: 2px 8px; font-size: 11px; max-width: 16
     }
     if (cur === "all" && it.container) top.appendChild(el("span", "chip2 cont", contName(it.container)));
     if (it.subs && it.subs.length) {
-      var lc = leafCount(it.subs);
+      var lc = directCount(it.subs);
       top.appendChild(progBadge(lc.d, lc.t));
     }
     main.appendChild(top);
