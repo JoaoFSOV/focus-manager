@@ -1,5 +1,5 @@
 -- Run once in Supabase: SQL Editor -> New query.
-create table public.items (
+create table public.focus_items (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null default auth.uid() references auth.users(id) on delete cascade,
   title text not null,
@@ -11,10 +11,10 @@ create table public.items (
   created_at timestamptz not null default now()
 );
 
-alter table public.items enable row level security;
+alter table public.focus_items enable row level security;
 
 -- Each signed-in user only sees and changes their own rows.
-create policy "own items" on public.items
+create policy "own focus items" on public.focus_items
   for all
   using (user_id = auth.uid())
   with check (user_id = auth.uid());

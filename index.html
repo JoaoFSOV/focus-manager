@@ -212,21 +212,21 @@ button.chip2 { cursor: pointer; }
     return o;
   }
   async function dbLoad() {
-    var r = await sb.from("items").select("*").order("created_at", { ascending: false });
+    var r = await sb.from("focus_items").select("*").order("created_at", { ascending: false });
     if (r.error) throw r.error;
     return r.data.map(fromRow);
   }
   async function dbAdd(p) {
-    var r = await sb.from("items").insert(toRow(p)).select().single();
+    var r = await sb.from("focus_items").insert(toRow(p)).select().single();
     if (r.error) throw r.error;
     return fromRow(r.data);
   }
   async function dbUpdate(id, p) {
-    var r = await sb.from("items").update(toRow(p)).eq("id", id);
+    var r = await sb.from("focus_items").update(toRow(p)).eq("id", id);
     if (r.error) throw r.error;
   }
   async function dbDelete(id) {
-    var r = await sb.from("items").delete().eq("id", id);
+    var r = await sb.from("focus_items").delete().eq("id", id);
     if (r.error) throw r.error;
   }
 

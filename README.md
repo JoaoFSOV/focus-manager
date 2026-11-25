@@ -5,7 +5,7 @@ Personal daily dashboard: ideas, projects and tasks as one kind of item (status:
 ## Files
 - `index.html`: the whole app.
 - `config.js`: your Supabase URL and anon key.
-- `schema.sql`: table and row-level security (each user only sees their own rows).
+- `schema.sql`: table `focus_items` (prefixed so other apps can share the same Supabase project) and row-level security (each user only sees their own rows).
 - `seed.sql`: optional starter items.
 
 ## Setup

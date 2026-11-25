@@ -1,6 +1,6 @@
 -- Optional. Run after you created your user (Authentication -> Users -> Add user).
 -- Loads the items that were in the Claude-hosted version.
-insert into public.items (user_id, title, status, next, created_at)
+insert into public.focus_items (user_id, title, status, next, created_at)
 select u.id, v.title, v.status, v.next, now() - (v.n || ' minutes')::interval
 from (select id from auth.users order by created_at limit 1) u,
 (values
