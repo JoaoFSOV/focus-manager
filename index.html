@@ -482,6 +482,7 @@ select.mini { min-height: 28px; padding: 2px 8px; font-size: 11px; max-width: 16
   function newId() { return "s" + Date.now().toString(36) + Math.random().toString(36).slice(2, 5); }
 
   var addingSub = null;
+  var plusDown = null;
 
   function subInput(it, id, placeholder, onAdd, cancelable) {
     var inp = el("input");
@@ -490,6 +491,13 @@ select.mini { min-height: 28px; padding: 2px 8px; font-size: 11px; max-width: 16
     inp.placeholder = placeholder;
     inp.maxLength = 160;
     inp.setAttribute("aria-label", placeholder);
+    if (cancelable) {
+      inp.addEventListener("blur", function () {
+        if (inp.value.trim() || addingSub === null || plusDown === addingSub) return;
+        addingSub = null; refocus = null;
+        setTimeout(render, 0);
+      });
+    }
     inp.addEventListener("keydown", function (e) {
       if (e.key === "Escape") { addingSub = null; render(); return; }
       if (e.key !== "Enter") return;
@@ -549,7 +557,9 @@ select.mini { min-height: 28px; padding: 2px 8px; font-size: 11px; max-width: 16
         ad.type = "button";
         ad.setAttribute("aria-label", "Add a subtask inside this one");
         ad.title = "Add a subtask inside";
+        ad.addEventListener("pointerdown", function () { plusDown = s.id; });
         ad.addEventListener("click", function () {
+          plusDown = null;
           addingSub = addingSub === s.id ? null : s.id;
           if (addingSub) delete collapsed[s.id];
           render();
