@@ -41,6 +41,7 @@ body {
 .sub { font-family: var(--mono); font-size: 11px; color: var(--muted); letter-spacing: .06em; text-transform: uppercase; }
 .take { margin: 0; font-size: 15px; color: var(--muted); line-height: 1.6; }
 .take b { color: var(--fg); font-family: var(--mono); font-weight: 600; }
+.lvls { font-family: var(--mono); font-size: 11px; color: var(--muted); margin-top: 4px; min-height: 14px; letter-spacing: .04em; }
 .kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
 .tile { background: linear-gradient(180deg, var(--panel2), var(--panel)); border: 1px solid var(--line); border-radius: 10px; padding: 14px 14px 12px; position: relative; overflow: hidden; min-width: 0; }
 .tile::after { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 2px; background: var(--accent); opacity: .8; box-shadow: 0 0 12px var(--accent); }
@@ -174,10 +175,10 @@ select.mini { min-height: 28px; padding: 2px 8px; font-size: 11px; max-width: 16
   <p class="take" id="take" aria-live="polite">Loading…</p>
 
   <section class="kpis" aria-live="polite">
-    <div class="tile" style="--accent: var(--cyan)"><div class="lab">Active</div><div class="val" id="s-active">0</div></div>
-    <div class="tile" style="--accent: var(--warn)"><div class="lab">Stalled</div><div class="val" id="s-stalled">0</div></div>
-    <div class="tile" style="--accent: var(--violet)"><div class="lab">Ideas</div><div class="val" id="s-ideas">0</div></div>
-    <div class="tile" style="--accent: var(--ok)"><div class="lab">Done</div><div class="val" id="s-done">0</div></div>
+    <div class="tile" style="--accent: var(--cyan)"><div class="lab">Active</div><div class="val" id="s-active">0</div><div class="lvls" id="l-active"></div></div>
+    <div class="tile" style="--accent: var(--warn)"><div class="lab">Stalled</div><div class="val" id="s-stalled">0</div><div class="lvls" id="l-stalled"></div></div>
+    <div class="tile" style="--accent: var(--violet)"><div class="lab">Ideas</div><div class="val" id="s-ideas">0</div><div class="lvls" id="l-ideas"></div></div>
+    <div class="tile" style="--accent: var(--ok)"><div class="lab">Done</div><div class="val" id="s-done">0</div><div class="lvls" id="l-done"></div></div>
   </section>
 
   <section class="p">
@@ -368,14 +369,37 @@ select.mini { min-height: 28px; padding: 2px 8px; font-size: 11px; max-width: 16
     });
   }
 
+  var LVL = ["main", "sub", "sub-sub", "L4", "L5", "L6"];
+  function addLevels(box, list, depth, wantDone) {
+    (list || []).forEach(function (x) {
+      if (!!x.done === wantDone) box[depth] = (box[depth] || 0) + 1;
+      if (x.c && x.c.length) addLevels(box, x.c, depth + 1, wantDone);
+    });
+  }
+  function showLevels(id, box) {
+    var n = $(id);
+    if (!n) return;
+    var parts = [];
+    for (var d = 0; d < LVL.length; d++) if (box[d]) parts.push(box[d] + " " + LVL[d]);
+    n.textContent = parts.join(" · ");
+  }
   function stats() {
     var a = 0, s = 0, i = 0, d = 0;
+    var lv = { active: {}, stalled: {}, idea: {}, done: {} };
     items.filter(inScope).forEach(function (it) {
-      if (it.done) d++;
-      else if (it.st === "idea") i++;
-      else if (it.st === "stalled") s++;
-      else a++;
+      var key;
+      if (it.done) { d++; key = "done"; lv.done[0] = (lv.done[0] || 0) + 1; }
+      else if (it.st === "idea") { i++; key = "idea"; }
+      else if (it.st === "stalled") { s++; key = "stalled"; }
+      else { a++; key = "active"; }
+      if (!it.done) lv[key][0] = (lv[key][0] || 0) + 1;
+      addLevels(lv[key], it.subs, 1, key === "done");
+      if (key !== "done") addLevels(lv.done, it.subs, 1, true);
     });
+    showLevels("l-active", lv.active);
+    showLevels("l-stalled", lv.stalled);
+    showLevels("l-ideas", lv.idea);
+    showLevels("l-done", lv.done);
     $("s-active").textContent = a;
     $("s-stalled").textContent = s;
     $("s-ideas").textContent = i;
