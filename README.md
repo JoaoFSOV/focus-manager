@@ -6,11 +6,12 @@ Personal daily dashboard: ideas, projects and tasks as one kind of item (status:
 - `index.html`: the whole app.
 - `config.js`: your Supabase URL and anon key.
 - `schema.sql`: table `focus_items` (prefixed so other apps can share the same Supabase project) and row-level security (each user only sees their own rows).
+- `migration_containers.sql`: containers (Work, Personal, ...); run it after `schema.sql`.
 - `seed.sql`: optional starter items.
 
 ## Setup
 1. Create a free project at supabase.com.
-2. SQL Editor: run `schema.sql`.
+2. SQL Editor: run `schema.sql`, then `migration_containers.sql`.
 3. Authentication -> Users -> Add user: your email and a strong password.
 4. Authentication -> Sign In / Providers: turn off "Allow new users to sign up" (single-user app).
 5. Optional: run `seed.sql` to load the starter items.

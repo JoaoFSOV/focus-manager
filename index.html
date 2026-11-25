@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Ideas &amp; Projects</title>
+<title>Focus Manager</title>
 <style>
 /* Layout: HUD console, same family as the Finance Control dashboard: header bar, takeaway line, KPI strip, then panels. */
 :root {
@@ -95,6 +95,12 @@ button.chip2 { cursor: pointer; }
 .sx:hover { color: var(--bad); }
 .sub-add input { width: 100%; min-height: 30px; padding: 4px 10px; font-size: 12px; }
 .prog { font-family: var(--mono); font-size: 10.5px; color: var(--muted); }
+.cchip { background: transparent; border: 1px solid var(--line2); border-radius: 6px; padding: 4px 12px; font-family: var(--mono); font-size: 11px; letter-spacing: .08em; color: var(--muted); cursor: pointer; }
+.cchip[aria-pressed=true] { background: var(--panel2); color: var(--violet); border-color: var(--violet); }
+.cont-edit, .cont-new { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.cont-edit input, .cont-new input { flex: 1 1 200px; min-width: 0; min-height: 34px; padding: 5px 10px; font-size: 12.5px; }
+select.mini { min-height: 28px; padding: 2px 8px; font-size: 11px; max-width: 160px; border-radius: 5px; }
+.chip2.cont { color: var(--violet); }
 @media (max-width: 760px) { .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 520px) {
   .row { grid-template-columns: auto minmax(0, 1fr); }
@@ -110,7 +116,7 @@ button.chip2 { cursor: pointer; }
 </head>
 <body>
 <div class="login p" id="login" hidden>
-  <h2>IDEAS<span style="color:var(--cyan)">//</span>CONTROL <small>sign in</small></h2>
+  <h2>FOCUS<span style="color:var(--cyan)">//</span>MANAGER <small>sign in</small></h2>
   <form id="login-form" autocomplete="on">
     <input type="text" id="li-email" name="email" autocomplete="username" placeholder="Email" aria-label="Email" inputmode="email">
     <input type="password" id="li-pass" name="password" autocomplete="current-password" placeholder="Password" aria-label="Password" style="background:var(--panel2);border:1px solid var(--line2);border-radius:6px;padding:9px 12px;min-height:40px;font-family:var(--mono);font-size:13px;color:inherit">
@@ -122,7 +128,7 @@ button.chip2 { cursor: pointer; }
   <header class="top">
     <div class="brand">
       <span class="dot" aria-hidden="true"></span>
-      <span class="k">IDEAS<em>//</em>CONTROL</span>
+      <span class="k">FOCUS<em>//</em>MANAGER</span>
       <span class="sub">daily dump · projects &amp; ideas</span>
     </div>
     <button class="ghost" id="logout" type="button">Sign out</button>
@@ -145,12 +151,23 @@ button.chip2 { cursor: pointer; }
         <option value="idea">Idea</option>
         <option value="active">Active</option>
       </select>
+      <select id="add-cont" aria-label="Container"></select>
       <button class="btn" type="submit">Add</button>
     </form>
   </section>
 
   <section class="p">
     <h2>Board <small>tick = done · pill = idea / active / stalled</small></h2>
+    <div class="chips" id="cbar" role="group" aria-label="Containers"></div>
+    <div class="cont-edit" id="cont-edit" hidden>
+      <input type="text" id="ren-name" aria-label="Container name" maxlength="40">
+      <button class="ghost" id="ren-save" type="button">Rename</button>
+      <button class="ghost" id="cont-del" type="button">Delete container</button>
+    </div>
+    <form class="cont-new" id="cont-form" autocomplete="off">
+      <input type="text" id="new-cont" placeholder="New container (Work, Personal...)" maxlength="40" aria-label="New container name">
+      <button class="ghost" type="submit">+ Container</button>
+    </form>
     <div class="chips" role="group" aria-label="Filter">
       <button class="chip" data-f="open" aria-pressed="true">Open</button>
       <button class="chip" data-f="active" aria-pressed="false">Active</button>
@@ -169,9 +186,15 @@ button.chip2 { cursor: pointer; }
   var cfg = window.APP_CONFIG || {};
   var sb = null;
   var items = [];
+  var containers = [];
+  var contOk = true;
+  var cur = "all";
+  var lastCur = null;
   var filter = "open";
   var armed = null;
   var armTimer = null;
+  var armedC = false;
+  var armCTimer = null;
   var dirty = false;
   var refocus = null;
   var chains = {};
@@ -184,6 +207,7 @@ button.chip2 { cursor: pointer; }
     m.textContent = text || "";
     m.className = "note" + (isErr ? " err" : "");
   }
+  function msgOf(e) { return e && e.message ? e.message : "unknown error"; }
 
   function el(tag, cls, text) {
     var n = document.createElement(tag);
@@ -198,6 +222,7 @@ button.chip2 { cursor: pointer; }
       id: r.id, title: r.title, st: r.status, done: !!r.done,
       doneAt: r.done_at ? Date.parse(r.done_at) : null,
       next: r.next || "", subs: Array.isArray(r.subs) ? r.subs : [],
+      container: r.container_id || null,
       createdAt: Date.parse(r.created_at)
     };
   }
@@ -209,12 +234,15 @@ button.chip2 { cursor: pointer; }
     if ("doneAt" in p) o.done_at = p.doneAt ? new Date(p.doneAt).toISOString() : null;
     if ("next" in p) o.next = p.next;
     if ("subs" in p) o.subs = p.subs;
+    if ("container" in p) o.container_id = p.container;
     return o;
   }
   async function dbLoad() {
-    var r = await sb.from("focus_items").select("*").order("created_at", { ascending: false });
-    if (r.error) throw r.error;
-    return r.data.map(fromRow);
+    var a = await sb.from("focus_items").select("*").order("created_at", { ascending: false });
+    if (a.error) throw a.error;
+    var c = await sb.from("focus_containers").select("*").order("created_at", { ascending: true });
+    contOk = !c.error;
+    return { items: a.data.map(fromRow), containers: c.error ? [] : c.data };
   }
   async function dbAdd(p) {
     var r = await sb.from("focus_items").insert(toRow(p)).select().single();
@@ -229,9 +257,23 @@ button.chip2 { cursor: pointer; }
     var r = await sb.from("focus_items").delete().eq("id", id);
     if (r.error) throw r.error;
   }
+  async function dbContAdd(name) {
+    var r = await sb.from("focus_containers").insert({ name: name }).select().single();
+    if (r.error) throw r.error;
+    return r.data;
+  }
+  async function dbContRename(id, name) {
+    var r = await sb.from("focus_containers").update({ name: name }).eq("id", id);
+    if (r.error) throw r.error;
+  }
+  async function dbContDelete(id) {
+    var r = await sb.from("focus_containers").delete().eq("id", id);
+    if (r.error) throw r.error;
+  }
 
   /* ---------- actions ---------- */
   function find(id) { for (var i = 0; i < items.length; i++) if (items[i].id === id) return items[i]; return null; }
+  function contName(id) { for (var i = 0; i < containers.length; i++) if (containers[i].id === id) return containers[i].name; return ""; }
 
   function save(id, patch) {
     var it = find(id);
@@ -242,7 +284,7 @@ button.chip2 { cursor: pointer; }
     render();
     var p = (chains[id] || Promise.resolve()).then(function () { return dbUpdate(id, patch); });
     chains[id] = p.catch(function () {});
-    p.then(function () { say(""); }, function () { say("Could not save that. Reloading from the server.", true); reload(); });
+    p.then(function () { say(""); }, function (e) { say("Could not save that: " + msgOf(e) + ". Reloading.", true); reload(); });
   }
 
   function saveSubs(it, ns) {
@@ -254,17 +296,29 @@ button.chip2 { cursor: pointer; }
     items = items.filter(function (x) { return x.id !== id; });
     render();
     (chains[id] || Promise.resolve()).then(function () { return dbDelete(id); })
-      .then(function () { say(""); }, function () { say("Could not delete. Reloading from the server.", true); reload(); });
+      .then(function () { say(""); }, function (e) { say("Could not delete: " + msgOf(e) + ". Reloading.", true); reload(); });
   }
 
   async function reload() {
-    try { items = await dbLoad(); loaded = true; render(); }
-    catch (e) { loaded = true; render(); say("Could not load the list: " + (e && e.message ? e.message : "unknown error"), true); }
+    try {
+      var d = await dbLoad();
+      items = d.items; containers = d.containers;
+      if (cur !== "all" && cur !== "none" && !contName(cur)) cur = "all";
+      loaded = true; render();
+      if (!contOk) say("Containers are not set up yet. Run migration_containers.sql in Supabase (see README).", true);
+    } catch (e) { loaded = true; render(); say("Could not load the list: " + msgOf(e), true); }
   }
 
   /* ---------- rendering ---------- */
+  function inScope(it) {
+    if (cur === "all") return true;
+    if (cur === "none") return !it.container;
+    return it.container === cur;
+  }
+
   function visible() {
     return items.filter(function (it) {
+      if (!inScope(it)) return false;
       if (filter === "done") return it.done;
       if (it.done) return false;
       if (filter === "active" || filter === "stalled" || filter === "idea") return it.st === filter;
@@ -274,7 +328,7 @@ button.chip2 { cursor: pointer; }
 
   function stats() {
     var a = 0, s = 0, i = 0, d = 0;
-    items.forEach(function (it) {
+    items.filter(inScope).forEach(function (it) {
       if (it.done) d++;
       else if (it.st === "idea") i++;
       else if (it.st === "stalled") s++;
@@ -292,6 +346,45 @@ button.chip2 { cursor: pointer; }
     t.appendChild(b(s)); t.appendChild(document.createTextNode(" stalled · "));
     t.appendChild(b(i)); t.appendChild(document.createTextNode(" ideas waiting. "));
     t.appendChild(document.createTextNode(s > 0 ? "Weekly review: unblock or drop the stalled ones." : "Nothing stuck."));
+  }
+
+  function fillContSelect(sel, value) {
+    sel.textContent = "";
+    var o0 = el("option", null, "Inbox"); o0.value = ""; sel.appendChild(o0);
+    containers.forEach(function (c) { var o = el("option", null, c.name); o.value = c.id; sel.appendChild(o); });
+    sel.value = value || "";
+  }
+
+  function renderBar() {
+    var bar = $("cbar");
+    bar.textContent = "";
+    function openCount(fn) { return items.filter(function (x) { return !x.done && fn(x); }).length; }
+    function chip(key, label, n) {
+      var b = el("button", "cchip", label + " " + n);
+      b.type = "button";
+      b.setAttribute("aria-pressed", cur === key ? "true" : "false");
+      b.addEventListener("click", function () {
+        cur = key; armedC = false;
+        $("add-cont").value = (key === "all" || key === "none") ? "" : key;
+        render();
+      });
+      bar.appendChild(b);
+    }
+    chip("all", "All", openCount(function () { return true; }));
+    chip("none", "Inbox", openCount(function (x) { return !x.container; }));
+    containers.forEach(function (c) { chip(c.id, c.name, openCount(function (x) { return x.container === c.id; })); });
+
+    var ed = $("cont-edit");
+    var isCont = cur !== "all" && cur !== "none";
+    ed.hidden = !isCont;
+    if (isCont && lastCur !== cur) $("ren-name").value = contName(cur);
+    lastCur = cur;
+    $("cont-del").textContent = armedC ? "Sure? Items go to Inbox" : "Delete container";
+    $("cont-del").className = "ghost" + (armedC ? " armed" : "");
+    $("cont-form").hidden = !contOk;
+    var ac = $("add-cont");
+    var keep = ac.value;
+    fillContSelect(ac, keep);
   }
 
   function subsUI(it) {
@@ -370,7 +463,20 @@ button.chip2 { cursor: pointer; }
       sb2.title = "Click to switch: idea, active, stalled";
       sb2.addEventListener("click", function () { save(it.id, { status: nx }); });
       top.appendChild(sb2);
+    } else {
+      var ro = el("select", "mini");
+      ro.setAttribute("aria-label", "Reopen as");
+      var o0 = el("option", null, "Reopen as…"); o0.value = ""; ro.appendChild(o0);
+      ["idea", "active", "stalled"].forEach(function (v) { var o = el("option", null, v); o.value = v; ro.appendChild(o); });
+      ro.addEventListener("change", function () {
+        if (!ro.value) return;
+        var u = { done: false, doneAt: null, status: ro.value };
+        if (it.subs && it.subs.length) u.subs = it.subs.map(function (s) { return { id: s.id, t: s.t, done: false }; });
+        save(it.id, u);
+      });
+      top.appendChild(ro);
     }
+    if (cur === "all" && it.container) top.appendChild(el("span", "chip2 cont", contName(it.container)));
     if (it.subs && it.subs.length) {
       var dn = it.subs.filter(function (s) { return s.done; }).length;
       top.appendChild(el("span", "prog", dn + "/" + it.subs.length));
@@ -400,6 +506,13 @@ button.chip2 { cursor: pointer; }
     li.appendChild(main);
 
     var act = el("div", "actions");
+    if (contOk) {
+      var mv = el("select", "mini");
+      mv.setAttribute("aria-label", "Move to container");
+      fillContSelect(mv, it.container);
+      mv.addEventListener("change", function () { save(it.id, { container: mv.value || null }); });
+      act.appendChild(mv);
+    }
     var del = el("button", "ghost" + (armed === it.id ? " armed" : ""), armed === it.id ? "Sure?" : "Delete");
     del.type = "button";
     del.addEventListener("click", function () {
@@ -419,14 +532,15 @@ button.chip2 { cursor: pointer; }
   }
 
   function render() {
+    renderBar();
     stats();
     var list = $("list");
     list.textContent = "";
     var vis = visible();
     if (!vis.length) {
       list.appendChild(el("li", "empty", !loaded ? "Loading…" : filter === "done"
-        ? "Nothing finished yet."
-        : "Nothing here. Add an idea above and it lands in this list."));
+        ? "Nothing finished here yet."
+        : "Nothing here. Add something above and it lands in this list."));
       return;
     }
     vis.forEach(function (it) { list.appendChild(row(it)); });
@@ -453,16 +567,70 @@ button.chip2 { cursor: pointer; }
     var t = $("add-title").value.trim();
     if (!t || !sb) return;
     var status = $("add-kind").value;
+    var cont = $("add-cont").value || null;
     $("add-title").value = "";
     try {
-      var created = await dbAdd({ title: t, status: status, next: "", done: false, subs: [] });
+      var p = { title: t, status: status, next: "", done: false, subs: [] };
+      if (cont) p.container = cont;
+      var created = await dbAdd(p);
       items.unshift(created);
       render();
       say("");
     } catch (e) {
       $("add-title").value = t;
-      say("Could not add that: " + (e && e.message ? e.message : "try again"), true);
+      say("Could not add that: " + msgOf(e), true);
     }
+  });
+
+  $("cont-form").addEventListener("submit", async function (ev) {
+    ev.preventDefault();
+    var n = $("new-cont").value.trim();
+    if (!n || !sb) return;
+    $("new-cont").value = "";
+    try {
+      var c = await dbContAdd(n);
+      containers.push(c);
+      cur = c.id; lastCur = null;
+      render();
+      $("add-cont").value = c.id;
+      say("");
+    } catch (e) {
+      $("new-cont").value = n;
+      say("Could not create the container: " + msgOf(e), true);
+    }
+  });
+
+  $("ren-save").addEventListener("click", async function () {
+    var n = $("ren-name").value.trim();
+    if (!n || cur === "all" || cur === "none") return;
+    var id = cur;
+    try {
+      await dbContRename(id, n);
+      containers.forEach(function (c) { if (c.id === id) c.name = n; });
+      render();
+      say("");
+    } catch (e) { say("Could not rename: " + msgOf(e), true); }
+  });
+
+  $("cont-del").addEventListener("click", async function () {
+    if (cur === "all" || cur === "none") return;
+    if (!armedC) {
+      armedC = true;
+      clearTimeout(armCTimer);
+      armCTimer = setTimeout(function () { armedC = false; render(); }, 3000);
+      render();
+      return;
+    }
+    armedC = false;
+    var id = cur;
+    try {
+      await dbContDelete(id);
+      containers = containers.filter(function (c) { return c.id !== id; });
+      items.forEach(function (x) { if (x.container === id) x.container = null; });
+      cur = "all";
+      render();
+      say("");
+    } catch (e) { say("Could not delete the container: " + msgOf(e), true); }
   });
 
   function showApp(on) {
@@ -496,7 +664,7 @@ button.chip2 { cursor: pointer; }
       if (session) {
         if (!authed) { showApp(true); loaded = false; render(); reload(); }
       } else {
-        showApp(false); items = []; loaded = false;
+        showApp(false); items = []; containers = []; loaded = false;
       }
     });
     sb.auth.getSession().then(function (r) {

@@ -22,3 +22,5 @@ create policy "own focus items" on public.focus_items
 -- Newer Supabase projects do not expose new tables to the Data API automatically.
 grant usage on schema public to authenticated;
 grant select, insert, update, delete on public.focus_items to authenticated;
+
+-- Containers: run migration_containers.sql after this file (fresh install or not).
