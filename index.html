@@ -555,14 +555,15 @@ select.mini { min-height: 28px; padding: 2px 8px; font-size: 11px; max-width: 16
   }
 
   /* ---------- wiring ---------- */
-  document.querySelectorAll(".chip").forEach(function (c) {
-    c.addEventListener("click", function () {
-      filter = c.getAttribute("data-f");
-      document.querySelectorAll(".chip").forEach(function (o) {
-        o.setAttribute("aria-pressed", o === c ? "true" : "false");
-      });
-      render();
+  function setFilter(f) {
+    filter = f;
+    document.querySelectorAll(".chip").forEach(function (o) {
+      o.setAttribute("aria-pressed", o.getAttribute("data-f") === f ? "true" : "false");
     });
+    render();
+  }
+  document.querySelectorAll(".chip").forEach(function (c) {
+    c.addEventListener("click", function () { setFilter(c.getAttribute("data-f")); });
   });
 
   document.addEventListener("focusin", function (e) {
@@ -581,7 +582,9 @@ select.mini { min-height: 28px; padding: 2px 8px; font-size: 11px; max-width: 16
       if (cont) p.container = cont;
       var created = await dbAdd(p);
       items.unshift(created);
-      render();
+      if (!inScope(created)) { cur = created.container || "none"; lastCur = null; }
+      if (filter !== "open" && visible().indexOf(created) === -1) filter = "open";
+      setFilter(filter);
       say("");
     } catch (e) {
       $("add-title").value = t;
