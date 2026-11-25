@@ -98,6 +98,8 @@ button.chip2 { cursor: pointer; }
 .sx:hover { color: var(--bad); }
 .sub-add input { width: 100%; min-height: 30px; padding: 4px 10px; font-size: 12px; }
 .prog { font-family: var(--mono); font-size: 10.5px; color: var(--muted); }
+button.prog { background: transparent; border: 1px solid var(--line2); border-radius: 4px; padding: 2px 7px; cursor: pointer; }
+button.prog:hover { color: var(--cyan); border-color: var(--cyan); }
 .cchip { background: transparent; border: 1px solid var(--line2); border-radius: 6px; padding: 4px 12px; font-family: var(--mono); font-size: 11px; letter-spacing: .08em; color: var(--muted); cursor: pointer; }
 .cchip.edit { margin-left: auto; border-style: dashed; color: var(--dim); }
 .cchip.edit[aria-pressed=true] { color: var(--fg); border-color: var(--muted); background: transparent; }
@@ -207,6 +209,8 @@ select.mini { min-height: 28px; padding: 2px 8px; font-size: 11px; max-width: 16
   var editing = false;
   var lastCur = null;
   var filter = "open";
+  var collapsed = {};
+  try { collapsed = JSON.parse(localStorage.getItem("fm-collapsed") || "{}") || {}; } catch (e) { collapsed = {}; }
   var armed = null;
   var armTimer = null;
   var armedC = false;
@@ -507,11 +511,21 @@ select.mini { min-height: 28px; padding: 2px 8px; font-size: 11px; max-width: 16
     if (cur === "all" && it.container) top.appendChild(el("span", "chip2 cont", contName(it.container)));
     if (it.subs && it.subs.length) {
       var dn = it.subs.filter(function (s) { return s.done; }).length;
-      top.appendChild(el("span", "prog", dn + "/" + it.subs.length));
+      var isC = !!collapsed[it.id];
+      var tg = el("button", "prog", (isC ? "▸ " : "▾ ") + dn + "/" + it.subs.length);
+      tg.type = "button";
+      tg.setAttribute("aria-expanded", isC ? "false" : "true");
+      tg.title = isC ? "Show subtasks" : "Hide subtasks";
+      tg.addEventListener("click", function () {
+        if (collapsed[it.id]) delete collapsed[it.id]; else collapsed[it.id] = 1;
+        try { localStorage.setItem("fm-collapsed", JSON.stringify(collapsed)); } catch (e) {}
+        render();
+      });
+      top.appendChild(tg);
     }
     main.appendChild(top);
 
-    main.appendChild(subsUI(it));
+    if (!(it.subs && it.subs.length && collapsed[it.id])) main.appendChild(subsUI(it));
     li.appendChild(main);
 
     var act = el("div", "actions");
