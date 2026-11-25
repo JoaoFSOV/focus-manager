@@ -371,10 +371,12 @@ select.mini { min-height: 28px; padding: 2px 8px; font-size: 11px; max-width: 16
   }
 
   var LVL = ["main", "sub", "sub-sub", "L4", "L5", "L6"];
-  function addLevels(box, list, depth, wantDone) {
+  function addLevels(lv, list, depth, parentSt) {
     (list || []).forEach(function (x) {
-      if (!!x.done === wantDone) box[depth] = (box[depth] || 0) + 1;
-      if (x.c && x.c.length) addLevels(box, x.c, depth + 1, wantDone);
+      var eff = x.st || parentSt || "active";
+      var key = x.done ? "done" : eff;
+      lv[key][depth] = (lv[key][depth] || 0) + 1;
+      if (x.c && x.c.length) addLevels(lv, x.c, depth + 1, eff);
     });
   }
   function showLevels(id, box) {
@@ -406,8 +408,7 @@ select.mini { min-height: 28px; padding: 2px 8px; font-size: 11px; max-width: 16
       else if (it.st === "stalled") { s++; key = "stalled"; }
       else { a++; key = "active"; }
       if (!it.done) lv[key][0] = (lv[key][0] || 0) + 1;
-      addLevels(lv[key], it.subs, 1, key === "done");
-      if (key !== "done") addLevels(lv.done, it.subs, 1, true);
+      addLevels(lv, it.subs, 1, it.st);
     });
     showLevels("s-active", lv.active);
     showLevels("s-stalled", lv.stalled);
@@ -487,18 +488,19 @@ select.mini { min-height: 28px; padding: 2px 8px; font-size: 11px; max-width: 16
   }
 
   /* nested subtasks: a sub is {id, t, done, c?: [subs]}; a sub with children is done when all its children are */
+  function keepSt(o, src) { if (src && src.st) o.st = src.st; return o; }
   function mapSubs(list, fn) {
     return list.map(function (s) {
       var n = fn(s);
       if (n.c && n.c.length) {
-        n = { id: n.id, t: n.t, done: n.c.every(function (x) { return x.done; }), c: n.c };
+        n = keepSt({ id: n.id, t: n.t, done: n.c.every(function (x) { return x.done; }), c: n.c }, n);
       }
       return n;
     });
   }
   function setAll(list, done) {
     return list.map(function (s) {
-      var o = { id: s.id, t: s.t, done: done };
+      var o = keepSt({ id: s.id, t: s.t, done: done }, s);
       if (s.c && s.c.length) o.c = setAll(s.c, done);
       return o;
     });
@@ -507,16 +509,16 @@ select.mini { min-height: 28px; padding: 2px 8px; font-size: 11px; max-width: 16
     return list.map(function (s) {
       if (s.c && s.c.length) {
         var c = fixTree(s.c);
-        return { id: s.id, t: s.t, done: c.every(function (x) { return x.done; }), c: c };
+        return keepSt({ id: s.id, t: s.t, done: c.every(function (x) { return x.done; }), c: c }, s);
       }
-      return { id: s.id, t: s.t, done: !!s.done };
+      return keepSt({ id: s.id, t: s.t, done: !!s.done }, s);
     });
   }
   function editTree(list, id, fn) {
     var out = [];
     list.forEach(function (s) {
       if (s.id === id) { var r = fn(s); if (r) out.push(r); return; }
-      if (s.c && s.c.length) out.push({ id: s.id, t: s.t, done: s.done, c: editTree(s.c, id, fn) });
+      if (s.c && s.c.length) out.push(keepSt({ id: s.id, t: s.t, done: s.done, c: editTree(s.c, id, fn) }, s));
       else out.push(s);
     });
     return fixTree(out);
@@ -636,10 +638,11 @@ select.mini { min-height: 28px; padding: 2px 8px; font-size: 11px; max-width: 16
     return box;
   }
 
-  function subList(it, list, depth) {
+  function subList(it, list, depth, parentSt) {
     var wrap = el("div", "subs" + (depth ? " nested" : ""));
     list.forEach(function (s) {
       var has = s.c && s.c.length;
+      var eff = s.st || parentSt || "active";
       var r = el("div", "sub-r" + (s.done ? " sdone" : ""));
       var c = el("button", "sc");
       c.type = "button";
@@ -648,7 +651,7 @@ select.mini { min-height: 28px; padding: 2px 8px; font-size: 11px; max-width: 16
       c.addEventListener("click", function () {
         saveSubs(it, editTree(it.subs, s.id, function (x) {
           var nd = !x.done;
-          var o = { id: x.id, t: x.t, done: nd };
+          var o = keepSt({ id: x.id, t: x.t, done: nd }, x);
           if (x.c && x.c.length) o.c = setAll(x.c, nd);
           return o;
         }));
@@ -658,7 +661,7 @@ select.mini { min-height: 28px; padding: 2px 8px; font-size: 11px; max-width: 16
       if (editingId === s.id) {
         r.appendChild(editBox(s.id, "st-edit", function (v) {
           saveSubs(it, editTree(it.subs, s.id, function (x) {
-            var o = { id: x.id, t: v, done: x.done }; if (x.c) o.c = x.c; return o;
+            var o = keepSt({ id: x.id, t: v, done: x.done }, x); if (x.c) o.c = x.c; return o;
           }));
         }));
       } else {
@@ -667,6 +670,18 @@ select.mini { min-height: 28px; padding: 2px 8px; font-size: 11px; max-width: 16
         pressable(st, function () { toggleOpen(s.id); 
         }, function () { startEdit(s.id, s.t); });
         r.appendChild(st);
+        if (!s.done) {
+          var nx = eff === "idea" ? "active" : eff === "active" ? "stalled" : "idea";
+          var sc = el("button", "chip2 " + eff, eff);
+          sc.type = "button";
+          sc.title = "Click to switch: idea, active, stalled";
+          sc.addEventListener("click", function () {
+            saveSubs(it, editTree(it.subs, s.id, function (x) {
+              var o = keepSt({ id: x.id, t: x.t, done: x.done }, x); o.st = nx; if (x.c) o.c = x.c; return o;
+            }));
+          });
+          r.appendChild(sc);
+        }
         r.appendChild(editBtn(s.id, s.t, "Edit subtask"));
       }
       var x = el("button", "sx", "×");
@@ -678,11 +693,11 @@ select.mini { min-height: 28px; padding: 2px 8px; font-size: 11px; max-width: 16
       r.appendChild(x);
       wrap.appendChild(r);
       if (opened[s.id]) {
-        var inner = has ? subList(it, s.c, depth + 1) : el("div", "subs nested");
+        var inner = has ? subList(it, s.c, depth + 1, eff) : el("div", "subs nested");
         if (!it.done && depth < 5) {
           inner.appendChild(subInput(it, "sub-" + s.id, "+ inside (Enter, Esc closes)", function (v) {
             saveSubs(it, editTree(it.subs, s.id, function (x) {
-              return { id: x.id, t: x.t, done: false, c: (x.c || []).concat([{ id: newId(), t: v, done: false }]) };
+              return keepSt({ id: x.id, t: x.t, done: false, c: (x.c || []).concat([{ id: newId(), t: v, done: false }]) }, x);
             }));
           }, true));
         }
@@ -693,7 +708,7 @@ select.mini { min-height: 28px; padding: 2px 8px; font-size: 11px; max-width: 16
   }
 
   function subsUI(it) {
-    var wrap = subList(it, it.subs || [], 0);
+    var wrap = subList(it, it.subs || [], 0, it.st);
     if (!it.done) {
       wrap.appendChild(subInput(it, "sub-" + it.id, "+ subtask (Enter, Esc closes)", function (v) {
         saveSubs(it, fixTree((it.subs || []).concat([{ id: newId(), t: v, done: false }])));
